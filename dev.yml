@@ -1,0 +1,2 @@
+commands:
+  build: corral run -- ponyc -Dopenssl_3.0.x
