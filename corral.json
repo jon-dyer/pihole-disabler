@@ -6,6 +6,10 @@
       "version": "1.3.3"
     },
     {
+      "locator": "github.com/ponylang/json.git",
+      "version": "0.2.0"
+    },
+    {
       "locator": "github.com/ponylang/http.git",
       "version": "0.6.2"
     }
