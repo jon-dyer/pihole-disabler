@@ -14,16 +14,27 @@ actor Main
   new create(env: Env) =>
     var env_pass: String = ""
     var env_base: String = ""
+    var timer: U64 = 120
     for plop in env.vars.values() do
       try
         let sploots = plop.split_by("=")
         let key = sploots(0)?
         let value = sploots(1)?
-        if key == "PIHOLE_BASE_URL" then
-          env_base = value
-        end
-        if key == "PIHOLE_PASS" then
-          env_pass = value
+        match key
+        | "PIHOLE_BASE_URL" => env_base = value
+        | "PIHOLE_PASS" => env_pass = value
+        | "PIHOLE_TIMER_SEC" =>
+          try
+            let t = value.u64(10)?
+            if t <= 300 then
+              timer = t
+            else
+              env.out.print("PHILE_TIMER_SEC too high, I am opinionatedly capping it at 5 minutes.")
+              timer = 300
+            end
+          else
+            env.err.print("Hey dude, your $PIHOLE_TIMER_SEC is in an invalid form. please check it.")
+          end
         end
       else
         env.out.print("environment variable '" + plop + "' doesn't have left and right of = somehow")
@@ -41,7 +52,7 @@ actor Main
     let timeout = U64(200)
 
     // Start the actor that does the real work.
-    GetAuth.create(env, env_base, env_pass, timeout)
+    GetAuth.create(env, env_base, env_pass, timer, timeout)
 
 actor GetAuth
   """
@@ -49,9 +60,10 @@ actor GetAuth
   """
   let _env: Env
   let _base_url: String
+  let _timer: U64
   let _timeout: U64
 
-  new create(env: Env, base_url: String, pass: String, timeout: U64)
+  new create(env: Env, base_url: String, pass: String, timer: U64, timeout: U64)
     =>
     """
     Create the worker actor.
@@ -59,26 +71,10 @@ actor GetAuth
     _env = env
     _base_url = base_url
     _timeout = timeout
+    _timer = timer
 
 
     this.auth_me(pass)
-/*
-    try
-      let body : String= "{\"password\":\"" + pass + "\"}"
-      let url =  mk_url(_env, _base_url, "auth/api")
-      let req = Payload.request("POST", url)
-      req("User-Agent") = "Pony httpget"
-      req("Content-Type") = "application/json"
-      req.add_chunk(body)
-
-      // Submit the request
-      let sentreq = client(consume req)?
-      // Could send body data via `sentreq`, if it was a POST
-    else
-      try env.out.print("Malformed URL: " + env.args(1)?) end
-      env.exitcode(1)
-    end
-    */
 
   be send_post(url: URL, body: String) =>
     // Get certificate for HTTPS links.
@@ -128,7 +124,7 @@ actor GetAuth
     send_post(url, body)
 
   be block_off(sid: String) =>
-    let body : String = "{\"blocking\": false, \"timer\": 120, \"sid\": \"" + sid + "\"}"
+    let body : String = "{\"blocking\": false, \"timer\": " + _timer.string() + ", \"sid\": \"" + sid + "\"}"
     let url =  mk_url(_env, _base_url, "/dns/blocking")
     send_post(url, body)
 
@@ -192,7 +188,7 @@ actor GetAuth
       try
         jsBod.parse(bodyVal)?
       else
-        _env.out.print("zorpzorp parsing bodyVal") 
+        _env.out.print("zorpzorp parsing bodyVal")
         _env.exitcode(1)
         return
       end

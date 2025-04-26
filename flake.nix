@@ -29,6 +29,7 @@
         shellHook = ''
           export PIHOLE_BASE_URL="https://example.org/"
           export PIHOLE_PASS="super reall password"
+          export PIHOLE_TIMER_SEC="10"
         '';
       };
     };
